@@ -6,12 +6,18 @@ model = joblib.load("trained_models/fraud_model.pkl")
 
 app = Flask(__name__)
 
-db = mysql.connector.connect(
-    host="localhost",
-    user="root",
-    password="Sai143aa4@",
-    database="fraudshield"
-)
+try:
+    db = mysql.connector.connect(
+        host="localhost",
+        user="root",
+        password="Sai143aa4@",
+        database="fraudshield"
+    )
+    print("✅ MySQL Connected")
+except Exception as e:
+    print("⚠ MySQL Not Connected:", e)
+    db = None
+    
 @app.route("/")
 def dashboard():
     return render_template("dashboard.html")
@@ -42,47 +48,55 @@ def approval():
             employment = request.form["employment"]
             loan = request.form["loan"]
             limit = float(request.form["limit"])
+
             statement = request.files["statement"]
             statement_name = statement.filename
 
+            # Approval Logic
             if score >= 750 and income >= 500000:
                 status = "Approved"
             else:
                 status = "Rejected"
 
-            cursor = db.cursor()
+            # Save to database only if MySQL is connected
+            if db is not None:
 
-            query = """
-            INSERT INTO applications
-            (
-                name,
-                age,
-                pan,
-                income,
-                credit_score,
-                employment_status,
-                existing_loan,
-                credit_limit,
-                status
-            )
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
-            """
+                cursor = db.cursor()
 
-            values = (
-                name,
-                age,
-                pan,
-                income,
-                score,
-                employment,
-                loan,
-                limit,
-                status
-            )
+                query = """
+                INSERT INTO applications
+                (
+                    name,
+                    age,
+                    pan,
+                    income,
+                    credit_score,
+                    employment_status,
+                    existing_loan,
+                    credit_limit,
+                    status
+                )
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                """
 
-            cursor.execute(query, values)
-            db.commit()
-            cursor.close()
+                values = (
+                    name,
+                    age,
+                    pan,
+                    income,
+                    score,
+                    employment,
+                    loan,
+                    limit,
+                    status
+                )
+
+                cursor.execute(query, values)
+                db.commit()
+                cursor.close()
+
+            else:
+                print("MySQL not connected. Skipping database insert.")
 
             return render_template(
                 "result.html",
@@ -94,10 +108,9 @@ def approval():
             )
 
         except Exception as e:
-            return str(e)
+            return f"Error: {e}"
 
     return render_template("approval.html")
-
 
 @app.route("/upload", methods=["GET", "POST"])
 def upload():
